@@ -1,0 +1,93 @@
+---
+title: "Data 607 Project 1"
+author: "Wilson Chau"
+date: "2022-09-24"
+output: html_document
+---
+# Introduction:
+In this project, you’re given a text file with chess tournament results where the information has some structure. Your job is to create an R Markdown file that generates a .CSV file (that could for example be imported into a SQL database) with the following information for all of the players:
+Player’s Name, Player’s State, Total Number of Points, Player’s Pre-Rating, and Average Pre Chess Rating of Opponents
+For the first player, the information would be:
+Gary Hua, ON, 6.0, 1794, 1605
+
+My goal is to create the same format as above. 
+Name, State, Total Points, Pre-rating scores, and Avg Opp Pre-rating
+Load up the library and preview data
+```{r setup, include=FALSE}
+require(dplyr)
+require(readr)
+require(tidyr)
+require(stringr)
+require(knitr)
+load_txt <- readLines("https://raw.githubusercontent.com/Wilchau/Data607Project1/main/tournamentinfo.txt")
+head(load_txt)
+```
+## Cleaning:
+The data is unorganized, and i see that line 1 is occupied. The format is also not properly formatted or cleaned up. I use the str_locate function to help find the starting and ending positon of a specificed pattern. I also generate sequences to be used in extracting required field.
+
+```{r}
+c0 <- 0
+c1 <- unname(str_locate_all(pattern = '\\|', load_txt[5])[[1]][1,1])
+c2 <- unname(str_locate_all(pattern = '\\|', load_txt[5])[[1]][2,1])
+c3 <- unname(str_locate_all(pattern = '\\|', load_txt[5])[[1]][3,1])
+c4 <- max(nchar(load_txt))
+d1 <- seq(5, 196, 3) 
+d2 <- seq(6, 196, 3)   
+
+f1 <- load_txt[d1] 
+f2 <- load_txt[d2]     
+```
+## Extracting fields:
+This allows us to extract field and load it into the dataframe.
+I focus on taking the player's name and state first and extracting them into chess_data
+```{r}
+name <- substr(f1, c1+1, c2-2)
+name <- str_trim(name)
+Player_Name <- str_to_title(name) 
+s_raw <- substr(d2, c0, c1-1)
+State <- str_trim(s_raw)
+chess_data <- data.frame(Player_Name, State)
+```
+## Extracting fields part 2:
+I focus on taking points, and total points and extract them into one
+```{r}
+point <- substr(f1, c2+1, c3-1)        
+chess_data$TotalPoints <- sprintf("%.1f", as.numeric(point))
+pre <- substr(f2, c1+1, c2-1)
+pre <- str_extract(pre, ': *\\d{2,}')    
+chess_data$PreRating <- as.integer(str_extract(pre, '\\d{2,}'))
+```
+## Calculate Pre-rating opponent scores:
+To calculate the average Pre-rating of opponent 
+I work on using a nested loop for this scenario, while adding in the sequences.This should help generate the sequences of pre-rating.
+I use head() to see that this table is the correct format of the request from the introduction.
+ 
+```{r}
+oppenent <- substr(d1, c3+1, c4)
+oppenent <- str_extract_all(oppenent, '\\b\\d{1,}')
+oppenent <- as.matrix(oppenent)
+
+calculate <- function(z, p) {
+    temp <- z[p]
+    
+    for (place in temp){
+        rate <- 0
+        c <- 0
+        for(i in place) {
+            c <- c + 1
+            rate <- rate + chess_data$PreRating[as.numeric(i)]
+        }
+        rate <- round(rate / c) #This will calculate the average
+        
+    }
+    return(rate)
+}
+chess_data$AvgOppPreRating <- apply(oppenent, 1, calculate)
+
+head(chess_data) 
+```
+#Conversaion:
+Converting this output to .csv file
+```{r}
+write.csv(chess_data,"Chess_Tournament.csv")
+```
